@@ -807,12 +807,21 @@ def job_status(job_id):
         }
     })
 
+@app.route("/api/psi-key")
+@login_required
+def get_psi_key():
+    """Return PSI API key to authenticated users only — browser makes calls directly."""
+    key = PSI_API_KEY
+    if not key:
+        return jsonify({"error": "No API key configured on server"}), 404
+    return jsonify({"key": key})
+
 @app.route("/api/speed/direct", methods=["POST"])
 @login_required
 def run_speed_direct():
     """Synchronous speed check — returns results directly, no background thread needed."""
     data    = request.json
-    urls    = data.get("urls", [])[:5]   # max 5 at a time to avoid timeout
+    urls    = data.get("urls", [])[:5]
     if not urls:
         return jsonify({"error": "No URLs provided"}), 400
     results = {}
