@@ -1248,7 +1248,7 @@ def render_dashboard(audits):
 let tab='urls',jobId=null,pollT=null;
 function gyrSetTab(n){{tab=n===0?'urls':'sitemap';var u=document.getElementById('t-urls'),s=document.getElementById('t-sitemap'),bu=document.getElementById('btn-urls'),bs=document.getElementById('btn-sitemap');if(n===0){{u.style.display='flex';s.style.display='none';bu.style.background='#22c55e';bu.style.color='#0a0a0a';bs.style.background='transparent';bs.style.color='#555';}}else{{s.style.display='flex';u.style.display='none';bs.style.background='#22c55e';bs.style.color='#0a0a0a';bu.style.background='transparent';bu.style.color='#555';}};}}
 function checkUrlLimit(ta){{
-  const urls=ta.value.split('\n').filter(u=>u.trim().startsWith('http'));
+  const urls=ta.value.split(String.fromCharCode(10)).filter(u=>u.trim().startsWith('http'));
   const msg=document.getElementById('url-count-msg');
   if(urls.length>10){{
     msg.textContent=`⚠ Only first 10 of ${{urls.length}} URLs will be audited`;
