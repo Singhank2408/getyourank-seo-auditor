@@ -1100,8 +1100,8 @@ def render_dashboard(audits):
   </div>
   <div class="fg"><label>Input Method</label>
     <div style="display:flex;gap:3px;background:#0a0a0a;border-radius:7px;padding:3px;border:1px solid #1a1a1a">
-      <button id="btn-urls" onclick="switchTab('urls')" style="flex:1;padding:6px;font-size:11px;font-weight:700;border:none;border-radius:5px;background:#22c55e;color:#0a0a0a;cursor:pointer;transition:all .15s">Paste URLs</button>
-      <button id="btn-sitemap" onclick="switchTab('sitemap')" style="flex:1;padding:6px;font-size:11px;font-weight:500;border:none;border-radius:5px;background:transparent;color:#555;cursor:pointer;transition:all .15s">Sitemap</button>
+      <button id="btn-urls" onclick="tab='urls';document.getElementById('t-urls').style.display='flex';document.getElementById('t-sitemap').style.display='none';this.style.background='#22c55e';this.style.color='#0a0a0a';document.getElementById('btn-sitemap').style.background='transparent';document.getElementById('btn-sitemap').style.color='#555'" style="flex:1;padding:6px;font-size:11px;font-weight:700;border:none;border-radius:5px;background:#22c55e;color:#0a0a0a;cursor:pointer">Paste URLs</button>
+      <button id="btn-sitemap" onclick="tab='sitemap';document.getElementById('t-sitemap').style.display='flex';document.getElementById('t-urls').style.display='none';this.style.background='#22c55e';this.style.color='#0a0a0a';document.getElementById('btn-urls').style.background='transparent';document.getElementById('btn-urls').style.color='#555'" style="flex:1;padding:6px;font-size:11px;font-weight:500;border:none;border-radius:5px;background:transparent;color:#555;cursor:pointer">Sitemap</button>
     </div>
   </div>
   <div class="fg" id="t-urls">
