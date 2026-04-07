@@ -1099,9 +1099,9 @@ def render_dashboard(audits):
     <input type="text" id="siteName" placeholder="e.g. example.com"></div>
   </div>
   <div class="fg"><label>Input Method</label>
-    <div class="tabs" id="input-tabs">
-      <button class="tab on" onclick="switchTab('urls',this)">Paste URLs</button>
-      <button class="tab" onclick="switchTab('sitemap',this)">Sitemap</button>
+    <div style="display:flex;gap:3px;background:#0a0a0a;border-radius:7px;padding:3px;border:1px solid #1a1a1a">
+      <button id="btn-urls" onclick="switchTab('urls')" style="flex:1;padding:6px;font-size:11px;font-weight:700;border:none;border-radius:5px;background:#22c55e;color:#0a0a0a;cursor:pointer;transition:all .15s">Paste URLs</button>
+      <button id="btn-sitemap" onclick="switchTab('sitemap')" style="flex:1;padding:6px;font-size:11px;font-weight:500;border:none;border-radius:5px;background:transparent;color:#555;cursor:pointer;transition:all .15s">Sitemap</button>
     </div>
   </div>
   <div class="fg" id="t-urls">
@@ -1260,12 +1260,21 @@ function checkUrlLimit(ta){{
   }}
 }}
 
-function switchTab(t,btn){{
+function switchTab(t){{
   tab=t;
+  // Show/hide input sections
   document.getElementById('t-urls').style.display=t==='urls'?'flex':'none';
   document.getElementById('t-sitemap').style.display=t==='sitemap'?'flex':'none';
-  document.querySelectorAll('#input-tabs .tab').forEach(b=>b.classList.remove('on'));
-  btn.classList.add('on');
+  // Style the buttons directly
+  const urlBtn=document.getElementById('btn-urls');
+  const sitemapBtn=document.getElementById('btn-sitemap');
+  if(t==='urls'){{
+    urlBtn.style.background='#22c55e'; urlBtn.style.color='#0a0a0a'; urlBtn.style.fontWeight='700';
+    sitemapBtn.style.background='transparent'; sitemapBtn.style.color='#555'; sitemapBtn.style.fontWeight='500';
+  }}else{{
+    sitemapBtn.style.background='#22c55e'; sitemapBtn.style.color='#0a0a0a'; sitemapBtn.style.fontWeight='700';
+    urlBtn.style.background='transparent'; urlBtn.style.color='#555'; urlBtn.style.fontWeight='500';
+  }}
   document.getElementById('url-count-msg').textContent='';
 }}
 
