@@ -1354,7 +1354,7 @@ async function runSpeed(){{
       const scClass=typeof sc==='number'?(sc>=90?'grn':sc>=50?'ora':'red'):'neu';
       const badge=(v,label)=>{{
         const cls=v==='Good'?'bg':v==='Needs Improvement'?'bo':'br';
-        return v&&v!=='—'?`<span class="badge ${cls}">${{v}}</span>`:`<span style="color:#444">${{v||'—'}}</span>`;
+        return v&&v!=='—'?`<span class="badge ${{cls}}">${{v}}</span>`:`<span style="color:#444">${{v||'—'}}</span>`;
       }};
       cards.innerHTML+=`
         <div style="background:#0f0f0f;border:1px solid #1a1a1a;border-radius:9px;padding:16px">
