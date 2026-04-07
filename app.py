@@ -1261,23 +1261,7 @@ function checkUrlLimit(ta){{
   }}
 }}
 
-function switchTab(t){{
-  tab=t;
-  // Show/hide input sections
-  document.getElementById('t-urls').style.display=t==='urls'?'flex':'none';
-  document.getElementById('t-sitemap').style.display=t==='sitemap'?'flex':'none';
-  // Style the buttons directly
-  const urlBtn=document.getElementById('btn-urls');
-  const sitemapBtn=document.getElementById('btn-sitemap');
-  if(t==='urls'){{
-    urlBtn.style.background='#22c55e'; urlBtn.style.color='#0a0a0a'; urlBtn.style.fontWeight='700';
-    sitemapBtn.style.background='transparent'; sitemapBtn.style.color='#555'; sitemapBtn.style.fontWeight='500';
-  }}else{{
-    sitemapBtn.style.background='#22c55e'; sitemapBtn.style.color='#0a0a0a'; sitemapBtn.style.fontWeight='700';
-    urlBtn.style.background='transparent'; urlBtn.style.color='#555'; urlBtn.style.fontWeight='500';
-  }}
-  document.getElementById('url-count-msg').textContent='';
-}}
+
 
 function showTab(id,btn){{
   document.querySelectorAll('.rtab-c').forEach(e=>e.classList.remove('on'));
