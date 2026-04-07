@@ -1099,7 +1099,7 @@ def render_dashboard(audits):
     <input type="text" id="siteName" placeholder="e.g. example.com"></div>
   </div>
   <div class="fg"><label>Input Method</label>
-    <div class="tabs">
+    <div class="tabs" id="input-tabs">
       <button class="tab on" onclick="switchTab('urls',this)">Paste URLs</button>
       <button class="tab" onclick="switchTab('sitemap',this)">Sitemap</button>
     </div>
@@ -1112,6 +1112,7 @@ def render_dashboard(audits):
   <div class="fg" id="t-sitemap" style="display:none">
     <label>Sitemap URL</label>
     <input type="text" id="sitemapInput" placeholder="https://example.com/sitemap.xml">
+    <span style="font-size:10px;color:#444">First 10 URLs from sitemap will be audited</span>
   </div>
   <div class="fg">
     <label>Max URLs</label>
@@ -1263,7 +1264,9 @@ function switchTab(t,btn){{
   tab=t;
   document.getElementById('t-urls').style.display=t==='urls'?'flex':'none';
   document.getElementById('t-sitemap').style.display=t==='sitemap'?'flex':'none';
-  document.querySelectorAll('.tabs .tab').forEach((b,i)=>b.classList.toggle('on',(i===0&&t==='urls')||(i===1&&t==='sitemap')));
+  document.querySelectorAll('#input-tabs .tab').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('url-count-msg').textContent='';
 }}
 
 function showTab(id,btn){{
