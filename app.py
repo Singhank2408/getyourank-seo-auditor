@@ -19,7 +19,7 @@ app  = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 jobs = {}
 
-DB_PATH      = "users.db"
+DB_PATH = "/tmp/users.db"
 TIMEOUT      = 12
 CRAWL_DELAY  = 0.5
 LINK_DELAY   = 0.15
@@ -1201,8 +1201,9 @@ function dl(){{if(jobId)window.location.href='/api/download/'+jobId;}}
 # ══════════════════════════════════════════════════════════════════════
 # MAIN
 # ══════════════════════════════════════════════════════════════════════
+init_db()
+
 if __name__ == "__main__":
-    init_db()
     print("\n" + "="*54)
     print("  GetYouRank SEO Auditor")
     print("  Open: http://localhost:5000")
