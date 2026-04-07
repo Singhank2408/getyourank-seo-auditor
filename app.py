@@ -1028,7 +1028,10 @@ textarea{resize:vertical;min-height:110px;font-family:'DM Mono',monospace;font-s
 def render_dashboard(audits):
     history_rows = ""
     for a in audits:
-        dt = a["created"][:10] if a["created"] else ""
+        created = a["created"]
+if created and not isinstance(created, str):
+    created = str(created)
+dt = created[:10] if created else ""
         history_rows += f"""
         <div class="history-row">
           <div><div class="h-site">{a['site_name'] or 'Unknown'}</div>
