@@ -751,13 +751,16 @@ def start_audit():
     sitemap_url= data.get("sitemap_url","").strip()
     raw        = data.get("urls","")
 
+    MAX_URLS_PER_USER = 10
     if sitemap_url:
-        urls = parse_sitemap(sitemap_url, max_urls)
+        urls = parse_sitemap(sitemap_url, MAX_URLS_PER_USER)
         if not urls: return jsonify({"error": "Could not parse sitemap."}), 400
     else:
         urls = [u.strip() for u in raw.splitlines() if u.strip().startswith("http")]
-        urls = list(dict.fromkeys(urls))[:max_urls]
+        urls = list(dict.fromkeys(urls))[:MAX_URLS_PER_USER]
     if not urls: return jsonify({"error": "No valid URLs found."}), 400
+    if len(urls) > MAX_URLS_PER_USER:
+        urls = urls[:MAX_URLS_PER_USER]
 
     job_id = str(uuid.uuid4())[:8]
     jobs[job_id] = {
@@ -815,6 +818,24 @@ def get_psi_key():
     if not key:
         return jsonify({"error": "No API key configured on server"}), 404
     return jsonify({"key": key})
+
+@app.route("/api/save-speed/<job_id>", methods=["POST"])
+@login_required
+def save_speed_results(job_id):
+    """Receive speed results from browser and save to job for Excel rebuild."""
+    job = jobs.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found — please re-run the audit first"}), 404
+    results = request.json.get("results", {})
+    job["speed_map"] = results
+    # Rebuild Excel with speed data
+    try:
+        path, fname = build_excel(job, job.get("site_name", "Website"))
+        job["excel_path"] = path
+        job["excel_name"] = fname
+        return jsonify({"ok": True, "message": f"Excel rebuilt with speed data for {len(results)} URLs"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/speed/direct", methods=["POST"])
 @login_required
@@ -1084,18 +1105,21 @@ def render_dashboard(audits):
     </div>
   </div>
   <div class="fg" id="t-urls">
-    <label>URLs (one per line)</label>
-    <textarea id="urlInput" placeholder="https://example.com/&#10;https://example.com/about/"></textarea>
+    <label>URLs (one per line — max 10)</label>
+    <textarea id="urlInput" placeholder="https://example.com/&#10;https://example.com/about/&#10;https://example.com/contact/" oninput="checkUrlLimit(this)"></textarea>
+    <span id="url-count-msg" style="font-size:10px;color:#444"></span>
   </div>
   <div class="fg" id="t-sitemap" style="display:none">
     <label>Sitemap URL</label>
     <input type="text" id="sitemapInput" placeholder="https://example.com/sitemap.xml">
   </div>
-  <div class="fg"><label>Max URLs</label>
-    <div class="slider-row">
-      <input type="range" id="maxUrls" min="10" max="10000" value="100" step="50" oninput="document.getElementById('sv').textContent=this.value">
-      <span class="sv" id="sv">100</span>
+  <div class="fg">
+    <label>Max URLs</label>
+    <div style="background:#111;border:1px solid #1a1a1a;border-radius:7px;padding:8px 12px;font-size:12px;color:#22c55e;font-family:'DM Mono',monospace;display:flex;justify-content:space-between;align-items:center">
+      <span>10 URLs per audit</span>
+      <span style="font-size:10px;color:#444">Free plan limit</span>
     </div>
+    <input type="hidden" id="maxUrls" value="10">
   </div>
 
   <button class="run-btn" id="runBtn" onclick="startAudit()">Run Audit →</button>
@@ -1202,6 +1226,10 @@ def render_dashboard(audits):
     </div>
     <div id="spd-err" style="display:none;font-size:12px;color:#f87171;padding:8px;background:#1a0808;border-radius:6px;margin-bottom:12px"></div>
     <div id="spd-cards" style="display:flex;flex-direction:column;gap:12px"></div>
+    <div id="spd-save-row" style="display:none;margin-top:16px;padding-top:14px;border-top:1px solid #111">
+      <button class="speed-btn" id="spdSaveBtn" onclick="saveSpeedToExcel()" style="background:#22c55e;color:#0a0a0a;border-color:#22c55e">⬇ Save Speed Data to Excel</button>
+      <span id="spd-save-msg" style="font-size:11px;color:#444;margin-left:12px"></span>
+    </div>
   </div>
 
   <!-- DOWNLOAD -->
@@ -1217,6 +1245,20 @@ def render_dashboard(audits):
 
 <script>
 let tab='urls',jobId=null,pollT=null;
+function checkUrlLimit(ta){{
+  const urls=ta.value.split('\n').filter(u=>u.trim().startsWith('http'));
+  const msg=document.getElementById('url-count-msg');
+  if(urls.length>10){{
+    msg.textContent=`⚠ Only first 10 of ${{urls.length}} URLs will be audited`;
+    msg.style.color='#fb923c';
+  }}else if(urls.length>0){{
+    msg.textContent=`${{urls.length}} URL${{urls.length>1?'s':''}} entered`;
+    msg.style.color='#22c55e';
+  }}else{{
+    msg.textContent='';
+  }}
+}}
+
 function switchTab(t,btn){{
   tab=t;
   document.getElementById('t-urls').style.display=t==='urls'?'flex':'none';
@@ -1319,8 +1361,12 @@ async function doPoll(){{
     if(d.has_excel){{document.getElementById('dlBtn').disabled=false;document.getElementById('doneTag').style.display='inline-block';}}
   }}
 }}
+let speedResultsCache={{}};
+
 async function runSpeed(){{
   if(!jobId)return alert('Run an audit first.');
+  speedResultsCache={{}};
+  document.getElementById('spd-save-row').style.display='none';
   const btn=document.getElementById('spdBtn');
   btn.disabled=true;
   document.getElementById('spd-prog').style.display='block';
