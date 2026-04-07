@@ -734,7 +734,13 @@ def dashboard():
     except Exception as e:
         print(f"Dashboard DB error: {e}")
         audits = []
-    return Response(render_dashboard(audits), mimetype="text/html")
+    try:
+        html = render_dashboard(audits)
+        return Response(html, mimetype="text/html")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return f"Dashboard render error: {str(e)}", 500
 
 @app.route("/api/start", methods=["POST"])
 @login_required
