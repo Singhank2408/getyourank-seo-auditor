@@ -1100,8 +1100,8 @@ def render_dashboard(audits):
   </div>
   <div class="fg"><label>Input Method</label>
     <div style="display:flex;gap:3px;background:#0a0a0a;border-radius:7px;padding:3px;border:1px solid #1a1a1a">
-      <button id="btn-urls" onclick="tab='urls';document.getElementById('t-urls').style.display='flex';document.getElementById('t-sitemap').style.display='none';this.style.background='#22c55e';this.style.color='#0a0a0a';document.getElementById('btn-sitemap').style.background='transparent';document.getElementById('btn-sitemap').style.color='#555'" style="flex:1;padding:6px;font-size:11px;font-weight:700;border:none;border-radius:5px;background:#22c55e;color:#0a0a0a;cursor:pointer">Paste URLs</button>
-      <button id="btn-sitemap" onclick="tab='sitemap';document.getElementById('t-sitemap').style.display='flex';document.getElementById('t-urls').style.display='none';this.style.background='#22c55e';this.style.color='#0a0a0a';document.getElementById('btn-urls').style.background='transparent';document.getElementById('btn-urls').style.color='#555'" style="flex:1;padding:6px;font-size:11px;font-weight:500;border:none;border-radius:5px;background:transparent;color:#555;cursor:pointer">Sitemap</button>
+      <button id="btn-urls" onclick="gyrSetTab(0)" style="flex:1;padding:6px;font-size:11px;font-weight:700;border:none;border-radius:5px;background:#22c55e;color:#0a0a0a;cursor:pointer">Paste URLs</button>
+      <button id="btn-sitemap" onclick="gyrSetTab(1)" style="flex:1;padding:6px;font-size:11px;font-weight:500;border:none;border-radius:5px;background:transparent;color:#555;cursor:pointer">Sitemap</button>
     </div>
   </div>
   <div class="fg" id="t-urls">
@@ -1246,6 +1246,7 @@ def render_dashboard(audits):
 
 <script>
 let tab='urls',jobId=null,pollT=null;
+function gyrSetTab(n){{tab=n===0?'urls':'sitemap';var u=document.getElementById('t-urls'),s=document.getElementById('t-sitemap'),bu=document.getElementById('btn-urls'),bs=document.getElementById('btn-sitemap');if(n===0){{u.style.display='flex';s.style.display='none';bu.style.background='#22c55e';bu.style.color='#0a0a0a';bs.style.background='transparent';bs.style.color='#555';}}else{{s.style.display='flex';u.style.display='none';bs.style.background='#22c55e';bs.style.color='#0a0a0a';bu.style.background='transparent';bu.style.color='#555';}};}}
 function checkUrlLimit(ta){{
   const urls=ta.value.split('\n').filter(u=>u.trim().startsWith('http'));
   const msg=document.getElementById('url-count-msg');
