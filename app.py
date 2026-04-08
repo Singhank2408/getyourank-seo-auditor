@@ -343,47 +343,6 @@ def find_dups(results, field):
 # ══════════════════════════════════════════════════════════════════════
 # PAGE SPEED
 # ══════════════════════════════════════════════════════════════════════
-PSI_API_KEY = os.environ.get("PSI_API_KEY", "")
-
-def get_pagespeed(url, api_key=""):
-    key = api_key or PSI_API_KEY
-    params = {"url": url, "strategy": "mobile"}
-    if key: params["key"] = key
-    try:
-        r    = requests.get("https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
-                            params=params, timeout=30)
-        if r.status_code != 200: return {"error": f"HTTP {r.status_code}", "perf_score": "—"}
-        data = r.json()
-        lhr  = data.get("lighthouseResult",{})
-        cats = lhr.get("categories",{})
-        aud  = lhr.get("audits",{})
-        def sl(s): return "Good" if s and s>=0.9 else ("Needs Improvement" if s and s>=0.5 else "Poor")
-        def av(k): return aud.get(k,{}).get("displayValue","—")
-        def asc(k): return sl(aud.get(k,{}).get("score"))
-        return {
-            "perf_score": int((cats.get("performance",{}).get("score") or 0)*100),
-            "lcp": av("largest-contentful-paint"), "lcp_score": asc("largest-contentful-paint"),
-            "cls": av("cumulative-layout-shift"),  "cls_score": asc("cumulative-layout-shift"),
-            "tbt": av("total-blocking-time"),       "tbt_score": asc("total-blocking-time"),
-            "fcp": av("first-contentful-paint"),    "ttfb": av("server-response-time"),
-            "error": None,
-        }
-    except Exception as e:
-        return {"error": str(e)[:60], "perf_score": "—"}
-
-def run_pagespeed_batch(job_id, api_key):
-    job  = jobs.get(job_id)
-    if not job: return
-    urls = [r["url"] for r in job.get("results",[]) if not r.get("fetch_error")][:20]
-    job["speed_status"] = "running"; job["speed_total"] = len(urls); job["speed_progress"] = 0
-    speed_map = {}
-    for i, url in enumerate(urls):
-        job["speed_progress"] = i+1
-        speed_map[url] = get_pagespeed(url, api_key)
-        time.sleep(1.2)
-    job["speed_map"]    = speed_map
-    job["speed_status"] = "done"
-
 # ══════════════════════════════════════════════════════════════════════
 # LINK CHECKER
 # ══════════════════════════════════════════════════════════════════════
@@ -529,21 +488,6 @@ def build_excel(job, site_name):
         fk  = "red" if "Missing" in st else ("yellow" if st!="OK" else None)
         for ci,val in enumerate([img["page_url"],img["img_src"],img.get("alt_text",""),st,img.get("loading","")],1):
             dat(ws5, ri, ci, val, fk, ci in {1,2,3})
-
-    # ── Sheet 6: Page Speed ───────────────────────────────────────────
-    ws6 = wb.create_sheet("Page Speed (CWV)"); ws6.freeze_panes = "A2"
-    for ci,(h,w) in enumerate([("URL",52),("Score",10),("LCP",14),("LCP Rating",14),("CLS",12),("CLS Rating",14),("TBT",14),("FCP",14),("TTFB",14)],1):
-        hdr(ws6, 1, ci, h, w)
-    if speed:
-        for ri,(url,sp) in enumerate(speed.items(), 2):
-            score = sp.get("perf_score","—")
-            sfk   = "good" if isinstance(score,int) and score>=90 else ("warn" if isinstance(score,int) and score>=50 else "bad")
-            def rfk(v): return {"Good":"good","Needs Improvement":"warn","Poor":"bad"}.get(v)
-            vals = [url,score,sp.get("lcp","—"),sp.get("lcp_score","—"),sp.get("cls","—"),sp.get("cls_score","—"),sp.get("tbt","—"),sp.get("fcp","—"),sp.get("ttfb","—")]
-            for ci,val in enumerate(vals, 1):
-                dat(ws6, ri, ci, val, sfk if ci==2 else (rfk(val) if ci in {4,6} else None), ci==1)
-    else:
-        ws6.cell(row=2,column=1,value="Run Speed Audit from dashboard to populate this sheet.").font = Font(name="Calibri",italic=True,color="64748B")
 
     # ── Sheet 7: Duplicates ───────────────────────────────────────────
     ws7 = wb.create_sheet("Duplicate Report"); ws7.freeze_panes = "A2"
@@ -768,7 +712,7 @@ def start_audit():
         "results":[],"log":[],"current_url":"","phase":"crawl",
         "all_links":[],"all_images":[],"broken_links":[],
         "link_status":"pending","link_progress":0,"link_total":0,
-        "speed_status":"idle","speed_map":{},
+        
         "user_id": session["user_id"],
     }
     threading.Thread(target=run_audit, args=(job_id,urls,site_name), daemon=True).start()
@@ -790,8 +734,7 @@ def job_status(job_id):
         "has_excel":bool(job.get("excel_path")),
         "link_status":job.get("link_status","pending"),
         "link_progress":job.get("link_progress",0),"link_total":job.get("link_total",0),
-        "speed_status":job.get("speed_status","idle"),
-        "speed_progress":job.get("speed_progress",0),"speed_total":job.get("speed_total",0),
+        
         "summary":{
             "total":len(results),"issues":sum(1 for r in results if r.get("flags")),
             "fetch_errors":sum(1 for r in results if r.get("fetch_error")),
@@ -809,56 +752,6 @@ def job_status(job_id):
             "img_issues":sum(1 for i in imgs if i.get("has_issue")),
         }
     })
-
-@app.route("/api/psi-key")
-@login_required
-def get_psi_key():
-    """Return PSI API key to authenticated users only — browser makes calls directly."""
-    key = PSI_API_KEY
-    if not key:
-        return jsonify({"error": "No API key configured on server"}), 404
-    return jsonify({"key": key})
-
-@app.route("/api/save-speed/<job_id>", methods=["POST"])
-@login_required
-def save_speed_results(job_id):
-    """Receive speed results from browser and save to job for Excel rebuild."""
-    job = jobs.get(job_id)
-    if not job:
-        return jsonify({"error": "Job not found — please re-run the audit first"}), 404
-    results = request.json.get("results", {})
-    job["speed_map"] = results
-    # Rebuild Excel with speed data
-    try:
-        path, fname = build_excel(job, job.get("site_name", "Website"))
-        job["excel_path"] = path
-        job["excel_name"] = fname
-        return jsonify({"ok": True, "message": f"Excel rebuilt with speed data for {len(results)} URLs"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/api/speed/direct", methods=["POST"])
-@login_required
-def run_speed_direct():
-    """Synchronous speed check — returns results directly, no background thread needed."""
-    data    = request.json
-    urls    = data.get("urls", [])[:5]
-    if not urls:
-        return jsonify({"error": "No URLs provided"}), 400
-    results = {}
-    for url in urls:
-        results[url] = get_pagespeed(url, "")
-        time.sleep(0.5)
-    return jsonify({"results": results})
-
-@app.route("/api/speed/<job_id>", methods=["POST"])
-@login_required
-def run_speed(job_id):
-    job = jobs.get(job_id)
-    if not job: return jsonify({"error":"Not found"}), 404
-    api_key = request.json.get("api_key","")
-    threading.Thread(target=run_pagespeed_batch, args=(job_id,""), daemon=True).start()
-    return jsonify({"started":True})
 
 @app.route("/api/download/<job_id>")
 @login_required
@@ -919,7 +812,7 @@ def render_auth(mode):
       <div class="benefit"><span class="benefit-icon">✓</span> Full technical SEO audit (meta, schema, CWV)</div>
       <div class="benefit"><span class="benefit-icon">✓</span> Redirect chain & broken link detection</div>
       <div class="benefit"><span class="benefit-icon">✓</span> Image alt text audit</div>
-      <div class="benefit"><span class="benefit-icon">✓</span> Downloadable Excel report (7 sheets)</div>
+      <div class="benefit"><span class="benefit-icon">✓</span> Downloadable Excel report (6 sheets)</div>
     </div>
     """
     return f"""<!DOCTYPE html>
@@ -1152,7 +1045,6 @@ def render_dashboard(audits):
       <button class="rtab"     onclick="showTab('redirects',this)">Redirects</button>
       <button class="rtab"     onclick="showTab('links',this)">Broken Links</button>
       <button class="rtab"     onclick="showTab('images',this)">Images</button>
-      <button class="rtab"     onclick="showTab('speed',this)">Page Speed</button>
     </div>
   </div>
 
@@ -1172,7 +1064,7 @@ def render_dashboard(audits):
       <div class="irow"><span class="irow-n">Missing H1</span><span class="ib r" id="b-h1">—</span></div>
       <div class="irow"><span class="irow-n">Missing Canonical</span><span class="ib o" id="b-can">—</span></div>
       <div class="irow"><span class="irow-n">No Structured Data</span><span class="ib o" id="b-schema">—</span></div>
-      <div class="irow"><span class="irow-n">Slow Pages (&gt;2s)</span><span class="ib o" id="b-slow">—</span></div>
+
     </div>
     <div class="section-h">Crawl Log</div>
     <div class="log" id="logBox"></div>
@@ -1215,30 +1107,14 @@ def render_dashboard(audits):
     <div class="log" id="imgLog"></div>
   </div>
 
-  <!-- PAGE SPEED -->
-  <div class="rtab-c" id="rt-speed">
-    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;flex-wrap:wrap">
-      <button class="speed-btn" id="spdBtn" onclick="runSpeed()">▶ Run Speed Audit</button>
-      <span style="font-size:11px;color:#333">Checks mobile Core Web Vitals via Google PageSpeed Insights.</span>
-    </div>
-    <div id="spd-prog" style="display:none;margin-bottom:14px">
-      <div class="prog-hdr"><span class="prog-t" style="font-size:12px">Running PageSpeed...</span><span class="prog-c" id="sp-c"></span></div>
-      <div class="prog-bg"><div class="prog-fill" id="sp-f" style="width:50%;animation:pulse 1s infinite"></div></div>
-    </div>
-    <div id="spd-err" style="display:none;font-size:12px;color:#f87171;padding:8px;background:#1a0808;border-radius:6px;margin-bottom:12px"></div>
-    <div id="spd-cards" style="display:flex;flex-direction:column;gap:12px"></div>
-    <div id="spd-save-row" style="display:none;margin-top:16px;padding-top:14px;border-top:1px solid #111">
-      <button class="speed-btn" id="spdSaveBtn" onclick="saveSpeedToExcel()" style="background:#22c55e;color:#0a0a0a;border-color:#22c55e">⬇ Save Speed Data to Excel</button>
-      <span id="spd-save-msg" style="font-size:11px;color:#444;margin-left:12px"></span>
-    </div>
-  </div>
+
 
   <!-- DOWNLOAD -->
   <div id="dl-sec" style="display:none;border-top:1px solid #111;padding-top:16px">
     <div class="section-h">Export Report</div>
     <div style="display:flex;align-items:center;gap:12px">
       <button class="dl-btn" id="dlBtn" onclick="dl()" disabled>⬇ Download Excel Report</button>
-      <span class="done-tag" id="doneTag" style="display:none">✓ AUDIT COMPLETE — 7 SHEETS</span>
+      <span class="done-tag" id="doneTag" style="display:none">✓ AUDIT COMPLETE — 6 SHEETS</span>
     </div>
   </div>
 </div>
@@ -1340,16 +1216,7 @@ async function doPoll(){{
     document.getElementById('brokenLog').innerHTML=`<div class="lrow" style="color:#444;font-size:11px">Found ${{s.broken_links}} broken links (${{s.internal_broken}} internal). Full list in Excel → Broken Links sheet.</div>`;
   if(s.img_issues>0&&!document.getElementById('imgLog').innerHTML)
     document.getElementById('imgLog').innerHTML=`<div class="lrow" style="color:#444;font-size:11px">Found ${{s.img_issues}} images with alt issues across ${{s.total_images}} total. Full breakdown in Excel → Image Audit sheet.</div>`;
-  if(d.speed_status==='running'){{
-    document.getElementById('spd-prog').style.display='block';
-    const sp=d.speed_total>0?Math.round(d.speed_progress/d.speed_total*100):0;
-    document.getElementById('sp-f').style.width=sp+'%';
-    document.getElementById('sp-c').textContent=d.speed_progress+'/'+d.speed_total;
-  }}else if(d.speed_status==='done'){{
-    document.getElementById('spd-prog').style.display='none';
-    document.getElementById('spd-done').style.display='block';
-    document.getElementById('spdBtn').disabled=false;
-  }}
+
   if(d.status==='done'){{
     clearInterval(pollT);
     document.getElementById('progF').style.width='100%';
@@ -1358,97 +1225,7 @@ async function doPoll(){{
     if(d.has_excel){{document.getElementById('dlBtn').disabled=false;document.getElementById('doneTag').style.display='inline-block';}}
   }}
 }}
-let speedResultsCache={{}};
 
-async function runSpeed(){{
-  if(!jobId)return alert('Run an audit first.');
-  speedResultsCache={{}};
-  document.getElementById('spd-save-row').style.display='none';
-  const btn=document.getElementById('spdBtn');
-  btn.disabled=true;
-  document.getElementById('spd-prog').style.display='block';
-  document.getElementById('spd-err').style.display='none';
-  document.getElementById('spd-cards').innerHTML='';
-  document.getElementById('sp-c').textContent='Calling Google API...';
-
-  // Get URLs from current audit results
-  const statusRes=await fetch('/api/status/'+jobId);
-  const statusData=await statusRes.json();
-  const auditedUrls=(statusData.log||[]).map(r=>r.url).filter(u=>u).slice(0,5);
-
-  if(auditedUrls.length===0){{
-    document.getElementById('spd-err').textContent='No URLs found from current audit. Please run an audit first.';
-    document.getElementById('spd-err').style.display='block';
-    document.getElementById('spd-prog').style.display='none';
-    btn.disabled=false; return;
-  }}
-
-  try{{
-    const res=await fetch('/api/speed/direct',{{
-      method:'POST',
-      headers:{{'Content-Type':'application/json'}},
-      body:JSON.stringify({{urls:auditedUrls}})
-    }});
-    const data=await res.json();
-    document.getElementById('spd-prog').style.display='none';
-    btn.disabled=false;
-    if(data.error){{
-      document.getElementById('spd-err').textContent='Error: '+data.error;
-      document.getElementById('spd-err').style.display='block';
-      return;
-    }}
-    // Render cards
-    const cards=document.getElementById('spd-cards');
-    cards.innerHTML='';
-    for(const[url,sp] of Object.entries(data.results||{{}})){{
-      const score=sp.perf_score;
-      const sc=typeof score==='number'?score:'—';
-      const scClass=typeof sc==='number'?(sc>=90?'grn':sc>=50?'ora':'red'):'neu';
-      const badge=(v,label)=>{{
-        const cls=v==='Good'?'bg':v==='Needs Improvement'?'bo':'br';
-        return v&&v!=='—'?`<span class="badge ${{cls}}">${{v}}</span>`:`<span style="color:#444">${{v||'—'}}</span>`;
-      }};
-      cards.innerHTML+=`
-        <div style="background:#0f0f0f;border:1px solid #1a1a1a;border-radius:9px;padding:16px">
-          <div style="font-size:10px;color:#444;font-family:'DM Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:10px">${{url}}</div>
-          ${{sp.error?`<div style="color:#f87171;font-size:12px">API Error: ${{sp.error}}</div>`:`
-          <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
-            <div>
-              <div style="font-size:11px;color:#444;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Performance</div>
-              <div style="font-size:32px;font-weight:800;font-family:'DM Mono',monospace;color:${{typeof sc==='number'&&sc>=90?'#22c55e':sc>=50?'#fb923c':'#f87171'}}">${{sc}}</div>
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;flex:1">
-              <div style="background:#111;border-radius:6px;padding:8px">
-                <div style="font-size:11px;font-family:'DM Mono',monospace;font-weight:500;margin-bottom:3px">${{sp.lcp||'—'}}</div>
-                <div style="font-size:9px;color:#444">LCP ${{badge(sp.lcp_score)}}</div>
-              </div>
-              <div style="background:#111;border-radius:6px;padding:8px">
-                <div style="font-size:11px;font-family:'DM Mono',monospace;font-weight:500;margin-bottom:3px">${{sp.cls||'—'}}</div>
-                <div style="font-size:9px;color:#444">CLS ${{badge(sp.cls_score)}}</div>
-              </div>
-              <div style="background:#111;border-radius:6px;padding:8px">
-                <div style="font-size:11px;font-family:'DM Mono',monospace;font-weight:500;margin-bottom:3px">${{sp.tbt||'—'}}</div>
-                <div style="font-size:9px;color:#444">TBT ${{badge(sp.tbt_score)}}</div>
-              </div>
-              <div style="background:#111;border-radius:6px;padding:8px">
-                <div style="font-size:11px;font-family:'DM Mono',monospace;font-weight:500;margin-bottom:3px">${{sp.fcp||'—'}}</div>
-                <div style="font-size:9px;color:#444">FCP</div>
-              </div>
-              <div style="background:#111;border-radius:6px;padding:8px">
-                <div style="font-size:11px;font-family:'DM Mono',monospace;font-weight:500;margin-bottom:3px">${{sp.ttfb||'—'}}</div>
-                <div style="font-size:9px;color:#444">TTFB</div>
-              </div>
-            </div>
-          </div>`}}
-        </div>`;
-    }}
-  }}catch(e){{
-    document.getElementById('spd-err').textContent='Request failed: '+e.message;
-    document.getElementById('spd-err').style.display='block';
-    document.getElementById('spd-prog').style.display='none';
-    btn.disabled=false;
-  }}
-}}
 function dl(){{if(jobId)window.location.href='/api/download/'+jobId;}}
 </script>
 </body></html>"""
