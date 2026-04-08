@@ -746,6 +746,12 @@ def job_status(job_id):
             "missing_canonical":sum(1 for r in results if not r.get("canonical")),
             "no_schema":sum(1 for r in results if r.get("schema_count",0)==0),
             "slow_pages":sum(1 for r in results if int(r.get("resp_ms",0))>2000),
+            "title_too_long":sum(1 for r in results if r.get("title") and r.get("title_len",0)>60),
+            "title_too_short":sum(1 for r in results if r.get("title") and r.get("title_len",0)<30),
+            "desc_too_long":sum(1 for r in results if r.get("meta_desc") and r.get("meta_desc_len",0)>160),
+            "desc_too_short":sum(1 for r in results if r.get("meta_desc") and 0<r.get("meta_desc_len",0)<70),
+            "multiple_h1":sum(1 for r in results if r.get("h1_count",0)>1),
+            "missing_og_image":sum(1 for r in results if not r.get("og_image")),
             "broken_links":len(broken),
             "internal_broken":sum(1 for b in broken if b.get("type")=="internal"),
             "total_images":len(imgs),
@@ -1064,6 +1070,15 @@ def render_dashboard(audits):
       <div class="irow"><span class="irow-n">Missing H1</span><span class="ib r" id="b-h1">—</span></div>
       <div class="irow"><span class="irow-n">Missing Canonical</span><span class="ib o" id="b-can">—</span></div>
       <div class="irow"><span class="irow-n">No Structured Data</span><span class="ib o" id="b-schema">—</span></div>
+      <div class="irow"><span class="irow-n">Title Too Long (&gt;60)</span><span class="ib o" id="b-tlong">—</span></div>
+      <div class="irow"><span class="irow-n">Title Too Short (&lt;30)</span><span class="ib o" id="b-tshort">—</span></div>
+      <div class="irow"><span class="irow-n">Meta Desc Too Long (&gt;160)</span><span class="ib o" id="b-dlong">—</span></div>
+      <div class="irow"><span class="irow-n">Meta Desc Too Short (&lt;70)</span><span class="ib o" id="b-dshort">—</span></div>
+      <div class="irow"><span class="irow-n">Multiple H1 Tags</span><span class="ib o" id="b-mh1">—</span></div>
+      <div class="irow"><span class="irow-n">Missing OG Image</span><span class="ib o" id="b-ogimg">—</span></div>
+      <div class="irow"><span class="irow-n">Slow Pages (&gt;2s)</span><span class="ib o" id="b-slow">—</span></div>
+      <div class="irow"><span class="irow-n">Image Alt Issues</span><span class="ib o" id="b-imgiss">—</span></div>
+      <div class="irow"><span class="irow-n">Redirecting Pages</span><span class="ib o" id="b-redir">—</span></div>
 
     </div>
     <div class="section-h">Crawl Log</div>
@@ -1197,7 +1212,11 @@ async function doPoll(){{
     const set=(id,v)=>{{const e=document.getElementById(id);if(e)e.textContent=v;}};
     set('s-total',s.total);set('s-issues',s.issues);set('s-errors',s.fetch_errors);set('s-noindex',s.noindex);
     set('b-title',s.missing_title);set('b-desc',s.missing_desc);set('b-h1',s.missing_h1);
-    set('b-can',s.missing_canonical);set('b-schema',s.no_schema);set('b-slow',s.slow_pages);
+    set('b-can',s.missing_canonical);set('b-schema',s.no_schema);
+    set('b-tlong',s.title_too_long||0);set('b-tshort',s.title_too_short||0);
+    set('b-dlong',s.desc_too_long||0);set('b-dshort',s.desc_too_short||0);
+    set('b-mh1',s.multiple_h1||0);set('b-ogimg',s.missing_og_image||0);
+    set('b-slow',s.slow_pages||0);set('b-imgiss',s.img_issues||0);set('b-redir',s.redirects||0);
     set('s-redir',s.redirects);set('s-total2',s.total);set('s-noredir',s.total-s.redirects);
     set('s-broken',s.broken_links||0);set('s-bint',s.internal_broken||0);
     set('s-bext',(s.broken_links||0)-(s.internal_broken||0));
